@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:  
+  labels:
+    app: inventree-cache
+  name: inventree-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inventree-cache  
+  template:
+    metadata:      
+      labels:
+        app: inventree-cache
+    spec:
+      containers:
+      - image: redis:7.0
+        name: inventree-cache
+        ports:
+        - containerPort: 6379

@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: inventree-app
+  name: inventree-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inventree-app
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: inventree-app
+    spec:
+      initContainers:
+      - name: init-migrate
+        envFrom:
+          - configMapRef:
+              name: inventree-config
+        image: inventree/inventree:stable
+        command: ["python", "manage.py", "migrate"]
+        volumeMounts:
+        - mountPath: /home/inventree/data
+          name: inventree-data      
+      containers:
+      - name: inventree-server
+        image: inventree/inventree:stable
+        envFrom:
+          - configMapRef:
+              name: inventree-config
+        ports:
+          - containerPort: 8000
+        volumeMounts:
+          - mountPath: /home/inventree/data
+            name: inventree-data         
+          - mountPath: /var/www/static
+            name: inventree-data
+            subPath: static
+        lifecycle:
+          postStart:
+            exec:
+               command: ["/bin/sh", "-c", "cp -rf /home/inventree/InvenTree/InvenTree/static /home/inventree/data && cp -rf /home/inventree/InvenTree/InvenTree/static_i18n/i18n /var/www/static/i18n && cp -rf /root/.local/lib/python3.9/site-packages/django/contrib/admin/static/admin /var/www/static/admin"]
+      - name: inventree-proxy
+        image: nginx:stable
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - mountPath: /etc/nginx/conf.d/default.conf
+          name: config
+          subPath: nginx.prod.conf
+          readOnly: true
+        - mountPath: /var/www        
+          name: inventree-data                  
+      volumes:
+      - name: config
+        configMap:
+          name: inventree-nginx-config
+      - name: inventree-data
+        persistentVolumeClaim:
+          claimName: inventree-data
+      restartPolicy: Always
